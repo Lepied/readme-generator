@@ -1,38 +1,29 @@
-// ============================================
-// DOM Utility Functions
-// ============================================
-
 export function showAlert(message: string, type: 'success' | 'error' | 'info' = 'info'): void {
     const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type}`;
+    
+    // CSS 클래스 사용 (인라인 스타일 제거)
+    alertDiv.className = `alert alert-${type} slide-in`;
     alertDiv.textContent = message;
-    alertDiv.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        padding: 15px 20px;
-        border-radius: 8px;
-        background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
-        color: white;
-        z-index: 10000;
-        animation: slideIn 0.3s ease-out;
-    `;
     
     document.body.appendChild(alertDiv);
     
     setTimeout(() => {
-        alertDiv.style.animation = 'slideOut 0.3s ease-out';
+        alertDiv.classList.remove('slide-in');
+        alertDiv.classList.add('slide-out');
         setTimeout(() => alertDiv.remove(), 300);
     }, 3000);
 }
 
 export function showStatus(message: string): void {
     console.log(`[STATUS] ${message}`);
+    // 필요하다면 화면 하단 상태바 등에 표시하는 로직 추가 가능
 }
 
 export function updateChainProgress(step: number): void {
-    const progressSteps = document.querySelectorAll('.progress-step');
-    progressSteps.forEach((el, index) => {
+    // main.ts의 HTML 구조(#chainProgress li)에 맞게 선택자 수정
+    const steps = document.querySelectorAll('#chainProgress li');
+    
+    steps.forEach((el, index) => {
         if (index < step) {
             el.classList.add('completed');
             el.classList.remove('active');

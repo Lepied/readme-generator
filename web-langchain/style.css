@@ -403,3 +403,35 @@ footer {
     }
 }
 
+.alert {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 20px;
+    border-radius: 8px;
+    color: white;
+    z-index: 10000;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    opacity: 0;
+    transition: all 0.3s ease;
+}
+
+.alert-success { background: #10b981; }
+.alert-error { background: #ef4444; }
+.alert-info { background: #3b82f6; }
+
+.alert.slide-in {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.alert.slide-out {
+    opacity: 0;
+    transform: translateY(-20px);
+}
+
+/* 처음 생성될 때 위치 (애니메이션 전) */
+.alert:not(.slide-in):not(.slide-out) {
+    transform: translateY(-20px);
+}
+

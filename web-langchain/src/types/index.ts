@@ -1,13 +1,15 @@
-// ============================================
-// Type Definitions
-// ============================================
-
 export interface ProjectData {
   name: string;
   language: string;
   structure: string;
   files: string[];
   mainFiles: Record<string, string>;
+  
+  // 빠른 모드용 (문자열 데이터)
+  rawCodeAnalysis?: string;
+  rawPurposeAnalysis?: string;
+
+  // 체인 모드/고급 분석용 (구조화된 데이터)
   codeAnalysis?: CodeAnalysis;
 }
 
