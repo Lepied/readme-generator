@@ -7,10 +7,13 @@ import { CONFIG } from '../config/constants.js';
 
 let modelInstance: ChatGoogleGenerativeAI | null = null;
 
-export function initializeModel(apiKey: string): void {
+export function initializeModel(apiKey: string, model?: string): void {
+    const selectedModel = model || CONFIG.DEFAULT_MODEL;
+    console.log(`🔧 [Init] 모델 초기화: ${selectedModel}`);
+    
     modelInstance = new ChatGoogleGenerativeAI({
         apiKey,
-        model: CONFIG.DEFAULT_MODEL,
+        model: selectedModel,
         temperature: CONFIG.DEFAULT_TEMPERATURE,
         maxOutputTokens: CONFIG.MAX_OUTPUT_TOKENS,
     });

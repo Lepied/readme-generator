@@ -15,12 +15,23 @@
 
         <!-- API Key Section -->
         <section class="card">
-            <h2>🔑 API Key</h2>
+            <h2>🔑 API Key & Model</h2>
             <div class="input-group">
                 <input type="password" id="apiKey" placeholder="Google Gemini API Key 입력">
                 <button id="toggleKey" class="icon-btn">👁️</button>
             </div>
             <p class="hint">무료로 받기: <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a></p>
+            
+            <label style="display: block; margin: 15px 0 8px; font-weight: 600;">
+                📊 AI 모델 선택
+            </label>
+            <select id="modelSelect">
+                <option value="gemini-2.5-flash" selected>Gemini 2.5</option>
+                <option value="gemini-2.5-flash-lite">Gemini 2.5-Lite</option>
+                <option value="gemini-2.0-flash">Gemini 2.0</option>
+
+            </select>
+            
             <p class="hint">🔒 API Key는 브라우저에만 저장되며 서버로 전송되지 않습니다.</p>
         </section>
 
@@ -80,15 +91,6 @@
             <h2>⚙️ 생성 옵션</h2>
             
             <label style="display: block; margin-bottom: 10px; font-weight: 600;">
-                📊 AI 모델 선택
-            </label>
-            <select id="modelSelect">
-                <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash</option>
-                <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option>
-                <option value="gemini-2.0-flash">Gemini 2.0 Flash (안정적)</option>
-            </select>
-            
-            <label style="display: block; margin: 20px 0 10px; font-weight: 600;">
                 🎯 생성 모드 선택
             </label>
             <div style="display: flex; gap: 15px; margin-bottom: 20px;">
