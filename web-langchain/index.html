@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📝 README Auto Generator (LangChain Edition)</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📝 README Auto Generator</h1>
+            <p class="subtitle">🔗 Powered by LangChain.js + Google Gemini</p>
+        </header>
+
+        <!-- API Key Section -->
+        <section class="card">
+            <h2>🔑 API Key</h2>
+            <div class="input-group">
+                <input type="password" id="apiKey" placeholder="Google Gemini API Key 입력">
+                <button id="toggleKey" class="icon-btn">👁️</button>
+            </div>
+            <p class="hint">무료로 받기: <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a></p>
+            <p class="hint">🔒 API Key는 브라우저에만 저장되며 서버로 전송되지 않습니다.</p>
+        </section>
+
+        <!-- Project Input Tabs -->
+        <section class="card">
+            <h2>📂 프로젝트 선택</h2>
+            
+            <div class="source-tabs">
+                <button class="tab-btn active" data-tab="github">🌐 GitHub</button>
+                <button class="tab-btn" data-tab="zip">📦 ZIP Upload</button>
+                <button class="tab-btn" data-tab="manual">✍️ Manual</button>
+            </div>
+
+            <!-- GitHub Tab -->
+            <div id="github-tab" class="tab-content active">
+                <input type="text" id="githubUrl" placeholder="예: https://github.com/facebook/react">
+                <button id="analyzeGithubBtn" class="btn primary">🔍 Repository 분석하기</button>
+            </div>
+
+            <!-- ZIP Tab -->
+            <div id="zip-tab" class="tab-content">
+                <div id="zipUploadArea" class="file-upload-area">
+                    <p>📦 ZIP 파일을 드래그하거나 클릭하세요</p>
+                    <input type="file" id="zipFile" accept=".zip" hidden>
+                </div>
+                <div id="zipInfo" style="display: none;">
+                    <p>✅ <span id="zipName"></span></p>
+                    <p><span id="zipSize"></span></p>
+                </div>
+            </div>
+
+            <!-- Manual Tab -->
+            <div id="manual-tab" class="tab-content">
+                <input type="text" id="projectName" placeholder="프로젝트 이름">
+                <input type="text" id="projectLanguage" placeholder="주요 언어 (예: Python, JavaScript)">
+                <textarea id="projectStructure" rows="8" placeholder="프로젝트 구조 (선택사항)"></textarea>
+            </div>
+        </section>
+
+        <!-- Project Info Card (After Analysis) -->
+        <section id="projectInfoCard" class="card" style="display: none;">
+            <h2>📊 감지된 프로젝트 정보</h2>
+            <div class="info-box">
+                <p><strong>프로젝트:</strong> <span id="detectedName"></span></p>
+                <p><strong>언어:</strong> <span id="detectedLanguage"></span></p>
+                <p><strong>주요 파일:</strong></p>
+                <div id="detectedFiles"></div>
+            </div>
+            <details>
+                <summary>📁 전체 구조 보기</summary>
+                <pre id="detectedStructure"></pre>
+            </details>
+        </section>
+
+        <!-- Generate Button -->
+        <section class="card">
+            <h2>⚙️ 생성 옵션</h2>
+            
+            <label style="display: block; margin-bottom: 10px; font-weight: 600;">
+                📊 AI 모델 선택
+            </label>
+            <select id="modelSelect">
+                <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash</option>
+                <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option>
+                <option value="gemini-2.0-flash">Gemini 2.0 Flash (안정적)</option>
+            </select>
+            
+            <label style="display: block; margin: 20px 0 10px; font-weight: 600;">
+                🎯 생성 모드 선택
+            </label>
+            <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                <label class="mode-option">
+                    <input type="radio" name="generationMode" value="optimized" checked>
+                    <div class="mode-card">
+                        <strong>⚡ 빠른 모드 </strong>
+                        <p>1회 API 호출 | 75% 비용 절감</p>
+                        <span class="badge success">빠름</span>
+                    </div>
+                </label>
+                <label class="mode-option">
+                    <input type="radio" name="generationMode" value="chain">
+                    <div class="mode-card">
+                        <strong>🔗 체인 모드</strong>
+                        <p>4회 API 호출 | 더 정교함</p>
+                        <span class="badge info">정교함</span>
+                    </div>
+                </label>
+            </div>
+            
+            <button id="generateBtn" class="btn primary large">🚀 README 생성하기</button>
+        </section>
+
+        <!-- Loading -->
+        <section id="loadingSection" class="card" style="display: none;">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>🤖 LangChain이 4단계 체인을 실행 중...</p>
+                <ol id="chainProgress" class="chain-steps">
+                    <li>📝 프로젝트 분석 및 요약 생성 중...</li>
+                    <li>✨ 주요 기능 추출 중...</li>
+                    <li>⚙️ 설치 방법 생성 중...</li>
+                    <li>💡 사용 예제 생성 중...</li>
+                </ol>
+            </div>
+        </section>
+
+        <!-- Result -->
+        <section id="resultSection" class="card" style="display: none;">
+            <h2>📄 생성된 README</h2>
+            
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="preview">👁️ Preview</button>
+                <button class="tab-btn" data-tab="markdown">📝 Markdown</button>
+            </div>
+
+            <div id="preview-tab" class="tab-content active">
+                <div id="resultPreview" class="markdown-preview"></div>
+            </div>
+
+            <div id="markdown-tab" class="tab-content">
+                <textarea id="resultMarkdown" rows="20"></textarea>
+            </div>
+
+            <div class="button-group">
+                <button id="copyBtn" class="btn">📋 복사</button>
+                <button id="downloadBtn" class="btn">💾 다운로드</button>
+            </div>
+        </section>
+    </div>
+
+    <footer>
+        <p>Made with 💙 using LangChain.js + Gemini API</p>
+    </footer>
+
+    <script type="module" src="/main.ts"></script>
+</body>
+</html>
