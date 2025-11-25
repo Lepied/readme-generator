@@ -1,15 +1,15 @@
 // web-langchain/main.ts
 
+import { marked } from 'marked'; // [Fix] marked 라이브러리 import
 import { initializeModel } from './src/core/gemini.js';
 import { createChain, runChain } from './src/core/langchain.js';
 import { showAlert, showStatus, updateChainProgress } from './src/utils/domUtils.js';
 import { buildTreeStructure, filterFiles, selectImportantFiles } from './src/utils/fileUtils.js';
 import { createProjectSummary } from './src/utils/projectUtils.js';
-import { README_GENERATION_PROMPT, CHAIN_STEP_PROMPTS, FEATURE_EXTRACTION_PROMPT, PURPOSE_ANALYSIS_PROMPT } from './src/prompts/readmePrompts.js';
-import { PROJECT_CATEGORY_PROMPT } from './src/prompts/analysisPrompts.js';
+import { README_GENERATION_PROMPT, CHAIN_STEP_PROMPTS, FEATURE_EXTRACTION_PROMPT } from './src/prompts/readmePrompts.js';
+import { PROJECT_CATEGORY_PROMPT, FILE_SELECTION_PROMPT } from './src/prompts/analysisPrompts.js'; // [New] FILE_SELECTION_PROMPT 추가
 import { PROJECT_TYPE_HINTS } from './src/config/projectTypes.js';
 import type { ProjectData } from './src/types/index.js';
-import { marked } from 'marked';
 
 // ============================================
 // State Management
@@ -45,7 +45,7 @@ const resultPreview = document.getElementById('resultPreview') as HTMLDivElement
 const resultMarkdown = document.getElementById('resultMarkdown') as HTMLTextAreaElement;
 const copyBtn = document.getElementById('copyBtn') as HTMLButtonElement;
 const downloadBtn = document.getElementById('downloadBtn') as HTMLButtonElement;
-const loadingSection = document.getElementById('loadingSection') as HTMLDivElement; // 로딩 섹션 추가
+const loadingSection = document.getElementById('loadingSection') as HTMLDivElement;
 
 // ============================================
 // API Key & Init
@@ -54,7 +54,7 @@ const loadingSection = document.getElementById('loadingSection') as HTMLDivEleme
 function loadApiKey(): void {
     const savedKey = localStorage.getItem('gemini_api_key');
     const savedModel = localStorage.getItem('selected_model') || 'gemini-2.5-flash';
-    
+
     if (savedKey) {
         currentApiKey = savedKey;
         if (apiKeyInput) {
@@ -71,7 +71,7 @@ function loadApiKey(): void {
 function saveApiKey(): void {
     const apiKey = apiKeyInput?.value.trim();
     if (!apiKey) return showAlert('API 키를 입력하세요', 'error');
-    
+
     const selectedModel = (modelSelect as HTMLSelectElement)?.value || 'gemini-2.5-flash';
     localStorage.setItem('gemini_api_key', apiKey);
     localStorage.setItem('selected_model', selectedModel);
@@ -89,37 +89,36 @@ toggleKeyBtn?.addEventListener('click', () => {
 apiKeyInput?.addEventListener('change', saveApiKey);
 
 // ============================================
-// GitHub Analysis
+// GitHub Analysis (AI Driven)
 // ============================================
 
 async function analyzeGitHub(): Promise<void> {
     const repoUrl = githubUrlInput?.value.trim();
     if (!repoUrl) return showAlert('GitHub URL을 입력하세요', 'error');
     if (!currentApiKey) return showAlert('먼저 API 키를 저장하세요', 'error');
-    
+
     try {
         if (analyzeGithubBtn) {
             analyzeGithubBtn.disabled = true;
             analyzeGithubBtn.textContent = '분석 중...';
         }
-        
+
         const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/);
         if (!match) throw new Error('올바른 GitHub URL이 아닙니다.');
-        
+
         const [, owner, repo] = match;
         showStatus(`📥 ${owner}/${repo} 메타데이터 가져오는 중...`);
-        
-        // 트리 가져오기
+
         let treeResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/main?recursive=1`);
         if (!treeResponse.ok) {
             treeResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/master?recursive=1`);
             if (!treeResponse.ok) throw new Error('저장소 정보를 가져올 수 없습니다. (접근 권한 또는 브랜치 확인)');
         }
-        
+
         const data = await treeResponse.json();
         await processGitHubRepo(owner, repo, data.tree);
         showAlert('분석 완료!', 'success');
-        
+
     } catch (error: any) {
         showAlert(error.message, 'error');
     } finally {
@@ -131,95 +130,117 @@ async function analyzeGitHub(): Promise<void> {
 }
 
 async function processGitHubRepo(owner: string, repo: string, tree: any[]): Promise<void> {
-    // 1. 파일 목록 추출 및 필터링
+    // 1. 파일 목록 추출 및 트리 생성
     const files = tree.filter((item: any) => item.type === 'file' || item.type === 'blob').map((item: any) => item.path);
     const filteredFiles = filterFiles(files);
-    
-    // 2. 언어 및 카테고리 감지 (개선된 로직)
-    let analyzedLanguage = detectLanguage(files);
-    console.log(`🔍 [Detect] 초기 감지 언어: ${analyzedLanguage}`);
+    const treeStructure = buildTreeStructure(filteredFiles); // AI에게 보여줄 트리 구조
 
-    // Unity/Unreal 등 특수 프로젝트는 AI 분석 전에도 확정 가능
-    if (analyzedLanguage === 'Unity' || analyzedLanguage === 'Unreal Engine') {
-        showStatus(`🎮 ${analyzedLanguage} 프로젝트 감지됨`);
-    } else if (currentApiKey) {
-        // 그 외의 경우 AI로 더 정확하게 분석 시도
+    // 2. 기본 언어 감지 (참고용)
+    let detectedLang = detectProjectType(files);
+    showStatus(`🔍 초기 감지 언어: ${detectedLang}`);
+
+    // 3. [핵심] AI가 직접 중요 파일 선정
+    let importantFiles: string[] = [];
+
+    if (currentApiKey) {
         try {
-            showStatus('🤖 AI로 프로젝트 성격 파악 중...');
-            const categoryChain = await createChain(PROJECT_CATEGORY_PROMPT, ['name', 'language', 'files']);
-            const categoryResult = await runChain(categoryChain, {
-                name: repo,
-                language: analyzedLanguage,
-                files: files.slice(0, 50).join('\n')
+            showStatus('🤖 AI가 프로젝트 구조를 분석하여 핵심 파일을 선정하는 중...');
+            console.log('📤 [AI] 파일 선택 요청 전송...');
+
+            const selectionChain = await createChain(FILE_SELECTION_PROMPT, ['fileTree']);
+            // 트리 구조가 너무 길면 잘라서 보냄 (토큰 제한 방지)
+            const selectionResult = await runChain(selectionChain, {
+                fileTree: treeStructure.slice(0, 15000)
             });
-            const langMatch = categoryResult.match(/언어[:\s]*([^\n]+)/i);
-            if (langMatch) analyzedLanguage = langMatch[1].trim();
-        } catch (e) { console.warn('AI 분석 실패, 기본값 사용'); }
+
+            // JSON 파싱 (AI가 마크다운 코드블록을 넣었을 경우를 대비해 정제)
+            const jsonStr = selectionResult.replace(/```json/g, '').replace(/```/g, '').trim();
+            importantFiles = JSON.parse(jsonStr);
+
+            console.log('✅ [AI] 선정된 핵심 파일:', importantFiles);
+            showStatus(`🤖 AI가 ${importantFiles.length}개의 핵심 파일을 선정했습니다.`);
+
+        } catch (e) {
+            console.error('⚠️ AI 파일 선정 실패, 기본 로직(Regex) 사용:', e);
+            // 실패 시 기존 Regex 방식 사용 (Fallback)
+            importantFiles = selectImportantFiles(filteredFiles, detectedLang);
+        }
+    } else {
+        importantFiles = selectImportantFiles(filteredFiles, detectedLang);
     }
 
-    // 3. 핵심 파일 다운로드
-    const importantFiles = selectImportantFiles(filteredFiles, analyzedLanguage);
+    // 4. 선정된 파일 내용 다운로드
     const mainFiles: Record<string, string> = {};
-    const MAX_FILES = 5;
+    const MAX_FILES = 5; // AI가 많이 골랐어도 안전을 위해 5개만 Fetch
     let fetchedCount = 0;
 
-    showStatus(`📥 핵심 파일 ${Math.min(MAX_FILES, importantFiles.length)}개 다운로드 중...`);
+    // AI가 고른 파일이 실제 목록에 있는지 검증하고 다운로드
+    const validFiles = importantFiles.filter(f => files.includes(f));
 
-    for (const filePath of importantFiles.slice(0, MAX_FILES)) {
+    showStatus(`📥 핵심 파일 다운로드 중 (${Math.min(MAX_FILES, validFiles.length)}개)...`);
+
+    for (const filePath of validFiles.slice(0, MAX_FILES)) {
         try {
             const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`);
             if (res.ok) {
                 const d = await res.json();
                 if (d.content && d.encoding === 'base64') {
                     const content = new TextDecoder('utf-8').decode(Uint8Array.from(atob(d.content.replace(/\n/g, '')), c => c.charCodeAt(0)));
+                    // 파일이 너무 크면 앞부분만 자름
                     if (content.length <= 150000) {
                         mainFiles[filePath] = content;
-                        fetchedCount++;
+                    } else {
+                        mainFiles[filePath] = content.slice(0, 100000) + '\n... (File truncated)';
                     }
+                    fetchedCount++;
                 }
             }
         } catch (e) { console.error(`${filePath} 로드 실패`); }
     }
 
-    // 4. 데이터 저장
+    // 5. 데이터 저장
     projectData = {
         name: repo,
-        language: analyzedLanguage,
-        structure: buildTreeStructure(files), // 트리 구조 생성
+        language: detectedLang, // 추후 AI 분석으로 업데이트 가능
+        structure: treeStructure,
         files: filteredFiles,
         mainFiles: mainFiles
     };
 
-    // 5. UI 업데이트
+    // 6. UI 업데이트
     if (projectInfoCard) projectInfoCard.style.display = 'block';
     if (detectedName) detectedName.textContent = projectData.name;
     if (detectedLanguage) detectedLanguage.textContent = projectData.language;
-    
-    // 구조 보기 UI 업데이트 (수정됨: 상세 태그 내부에 pre 태그로 구조 삽입)
+
     if (detectedFiles) {
         detectedFiles.innerHTML = `
             <p><strong>전체 파일:</strong> ${projectData.files.length}개</p>
-            <p><strong>핵심 분석 파일:</strong> ${Object.keys(mainFiles).length}개</p>
+            <p><strong>중요 파일:</strong> ${Object.keys(mainFiles).length}개</p>
             <details>
                 <summary>📂 프로젝트 전체 구조 보기 (클릭)</summary>
-                <pre style="max-height: 300px; overflow: auto; background: #f5f5f5; padding: 10px; border-radius: 5px;">${projectData.structure}</pre>
+                <pre style="max-height: 300px; overflow: auto; background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; font-size: 13px; line-height: 1.5; border: 1px solid #374151;">${projectData.structure}</pre>
             </details>
-            <div class="file-badges">
-                ${Object.keys(mainFiles).map(f => `<span class="badge badge-gray">${f}</span>`).join('')}
+            
+            <div class="file-badges" style="margin-top: 15px; display: flex; flex-wrap: wrap; gap: 8px;">
+                ${Object.keys(mainFiles).map(f => `
+                    <span style="background: #e5e7eb; color: #1f2937; padding: 4px 10px; border-radius: 6px; font-size: 0.9em; border: 1px solid #d1d5db; display: inline-block;">
+                        📄 ${f}
+                    </span>
+                `).join('')}
             </div>
         `;
     }
 }
 
 // ============================================
-// README Generation (Fast Mode 로직 개선)
+// README Generation
 // ============================================
 
 async function generateReadme(): Promise<void> {
     if (!currentApiKey || !projectData.name) return showAlert('프로젝트 분석을 먼저 진행해주세요.', 'error');
 
-    // 1. 로딩 표시 (필수: 어떤 모드든 보여야 함)
-    if (loadingSection) loadingSection.style.display = 'flex'; // block 대신 flex 추천 (중앙 정렬 위해)
+    // 로딩 표시
+    if (loadingSection) loadingSection.style.display = 'flex';
     if (generateBtn) generateBtn.disabled = true;
 
     try {
@@ -228,27 +249,23 @@ async function generateReadme(): Promise<void> {
         let result: string;
 
         if (isOptimized) {
-            // ==========================================
-            // ⚡ 빠른 모드: ONE SHOT (체인 없음)
-            // ==========================================
+            // ⚡ 빠른 모드: 단일 호출
             console.log('⚡ [Fast Mode] 단일 요청 실행');
-            showStatus('⚡ 빠른 모드로 README 생성 중... (잠시만 기다려주세요)');
+            showStatus('⚡ AI가 README를 작성 중입니다...');
 
-            const projectType = detectLanguage(projectData.files); // 재확인
+            const projectType = detectProjectType(projectData.files);
             const typeHints = PROJECT_TYPE_HINTS[projectType] || PROJECT_TYPE_HINTS['default'];
 
-            // 별도의 코드 분석 단계 없이, 파일 내용과 목록을 한 번에 프롬프트에 넣습니다.
             const projectSummaryRaw = `
 프로젝트명: ${projectData.name}
 언어: ${projectData.language}
-프로젝트 구조(트리):
-${projectData.structure.slice(0, 2000)}
+프로젝트 구조:
+${projectData.structure.slice(0, 3000)}
 
 핵심 파일 내용:
-${Object.entries(projectData.mainFiles).map(([path, content]) => `### ${path}\n${content.slice(0, 1500)}`).join('\n\n')}
+${Object.entries(projectData.mainFiles).map(([path, content]) => `### ${path}\n${content.slice(0, 2000)}`).join('\n\n')}
             `;
 
-            // 한번에 생성 요청
             const readmeChain = await createChain(README_GENERATION_PROMPT, ['projectType', 'typeHints', 'projectSummary']);
             result = await runChain(readmeChain, {
                 projectType,
@@ -257,13 +274,9 @@ ${Object.entries(projectData.mainFiles).map(([path, content]) => `### ${path}\n$
             });
 
         } else {
-            // ==========================================
             // 🔗 체인 모드: 단계별 실행
-            // ==========================================
             console.log('🔗 [Chain Mode] 단계별 실행');
-            showStatus('🔗 체인 모드로 정밀 분석 중...');
-            
-            // Step 1: Feature Extraction
+
             updateChainProgress(0);
             const featureChain = await createChain(FEATURE_EXTRACTION_PROMPT, ['name', 'language', 'codeFiles']);
             const codeFilesText = Object.entries(projectData.mainFiles)
@@ -274,7 +287,6 @@ ${Object.entries(projectData.mainFiles).map(([path, content]) => `### ${path}\n$
                 codeFiles: codeFilesText
             });
 
-            // Step 2: Installation
             updateChainProgress(1);
             const installChain = await createChain(CHAIN_STEP_PROMPTS.installation, ['name', 'language', 'projectType']);
             const installation = await runChain(installChain, {
@@ -283,7 +295,6 @@ ${Object.entries(projectData.mainFiles).map(([path, content]) => `### ${path}\n$
                 projectType: projectData.language
             });
 
-            // Step 3: Usage
             updateChainProgress(2);
             const usageChain = await createChain(CHAIN_STEP_PROMPTS.usage, ['projectInfo', 'features']);
             const usage = await runChain(usageChain, {
@@ -291,7 +302,6 @@ ${Object.entries(projectData.mainFiles).map(([path, content]) => `### ${path}\n$
                 features
             });
 
-            // Step 4: Structure & Finalize
             updateChainProgress(3);
             const structureChain = await createChain(CHAIN_STEP_PROMPTS.structure, ['structure']);
             const structureDesc = await runChain(structureChain, { structure: projectData.structure.slice(0, 1000) });
@@ -300,46 +310,55 @@ ${Object.entries(projectData.mainFiles).map(([path, content]) => `### ${path}\n$
         }
 
         if (resultMarkdown) resultMarkdown.value = result;
-        if (resultPreview) resultPreview.innerHTML = await marked.parse(result); // marked 라이브러리가 있다면 사용, 없다면 innerHTML = result
+        // [Fix] marked 라이브러리 사용 시 await 추가
+        if (resultPreview) resultPreview.innerHTML = await marked.parse(result);
         if (resultSection) resultSection.style.display = 'block';
-        
+
         showAlert('README 생성 완료!', 'success');
 
     } catch (e: any) {
         showAlert('생성 실패: ' + e.message, 'error');
+        console.error(e);
     } finally {
-        // 로딩 종료 (성공이든 실패든 무조건 실행)
         if (loadingSection) loadingSection.style.display = 'none';
         if (generateBtn) generateBtn.disabled = false;
     }
 }
 
 // ============================================
-// Helper: Language Detection (개선됨)
+// Helper: Language Detection
 // ============================================
 
-function detectLanguage(files: string[]): string {
-    // 1. 강력한 시그니처 먼저 확인 (Unity, Unreal, Flutter 등)
-    if (files.some(f => f.includes('Assets/') || f.includes('Library/') || f.endsWith('.unity'))) return 'Unity';
-    if (files.some(f => f.endsWith('.uproject') || f.includes('Source/') && f.includes('Config/'))) return 'Unreal Engine';
-    if (files.some(f => f.endsWith('pubspec.yaml'))) return 'Dart (Flutter)';
-    
-    // 2. 확장자 카운트
+function detectProjectType(files: string[]): string {
+    // 1. 게임 엔진 (기존 로직 유지 및 강화)
+    if (files.some(f => f.includes('Assets/') && f.endsWith('.unity'))) return 'Unity Game';
+    if (files.some(f => f.endsWith('.uproject'))) return 'Unreal Engine Game';
+
+    // 2. 웹/앱 프레임워크 시그니처 (파일명으로 감지)
+    if (files.some(f => f.endsWith('next.config.js') || f.endsWith('next.config.mjs'))) return 'Next.js App';
+    if (files.some(f => f.endsWith('vite.config.js') || f.endsWith('vite.config.ts'))) return 'Vite Project';
+    if (files.some(f => f.endsWith('angular.json'))) return 'Angular App';
+    if (files.some(f => f.includes('manage.py'))) return 'Django Project';
+    if (files.some(f => f.includes('pom.xml')) && files.some(f => f.includes('src/main/java'))) return 'Spring Boot';
+    if (files.some(f => f.endsWith('pubspec.yaml'))) return 'Flutter/Dart';
+    if (files.some(f => f.endsWith('cargo.toml'))) return 'Rust Crate';
+    if (files.some(f => f.endsWith('go.mod'))) return 'Go Module';
+
+    // 3. 확장자 카운트 (기존 로직 - Fallback)
     const extCount: Record<string, number> = {};
     files.forEach(f => {
         const ext = f.split('.').pop()?.toLowerCase();
         if (ext) extCount[ext] = (extCount[ext] || 0) + 1;
     });
 
-    if (extCount['py'] > 0 && extCount['py'] > (extCount['js'] || 0)) return 'Python';
-    if (extCount['cs'] > 0) return 'C#'; // Unity 체크 후에도 남아있다면 일반 C#
-    if (extCount['java'] > 0) return 'Java';
-    if (extCount['ts'] > 0 || extCount['tsx'] > 0) return 'TypeScript';
-    if (extCount['js'] > 0 || extCount['jsx'] > 0) return 'JavaScript';
-    
-    return 'Unknown';
-}
+    if (extCount['py'] > 0 && extCount['py'] > (extCount['js'] || 0)) return 'Python Script';
+    if (extCount['ts'] > 0 || extCount['tsx'] > 0) return 'TypeScript Project';
+    if (extCount['js'] > 0) return 'JavaScript Project';
+    if (extCount['cs'] > 0) return 'C# Project';
+    if (extCount['java'] > 0) return 'Java Project';
 
+    return 'Unknown Project';
+}
 // ============================================
 // Other Utils & Init
 // ============================================
@@ -361,13 +380,26 @@ downloadBtn?.addEventListener('click', () => {
     }
 });
 
+// ZIP Upload Handler (Placeholder)
+async function handleZipFile(file: File): Promise<void> {
+    if (!file.name.endsWith('.zip')) return showAlert('ZIP 파일만 가능합니다.', 'error');
+    showAlert('ZIP 분석 기능은 준비 중입니다.', 'info');
+}
+
+// Event Listeners for ZIP
+zipUploadArea?.addEventListener('click', () => zipFile?.click());
+zipUploadArea?.addEventListener('dragover', (e) => { e.preventDefault(); zipUploadArea.style.borderColor = '#4CAF50'; });
+zipUploadArea?.addEventListener('dragleave', () => { if (zipUploadArea) zipUploadArea.style.borderColor = '#ddd'; });
+zipUploadArea?.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    if (zipUploadArea) zipUploadArea.style.borderColor = '#ddd';
+    if (e.dataTransfer?.files[0]) await handleZipFile(e.dataTransfer.files[0]);
+});
+zipFile?.addEventListener('change', async (e) => { if ((e.target as HTMLInputElement)?.files?.[0]) await handleZipFile((e.target as HTMLInputElement).files![0]); });
+
 document.addEventListener('DOMContentLoaded', () => {
     loadApiKey();
-    // 탭 설정 로직 등이 있다면 여기에 포함
-    
-    // 버튼 이벤트 리스너 재확인
     if (analyzeGithubBtn) analyzeGithubBtn.addEventListener('click', analyzeGitHub);
     if (generateBtn) generateBtn.addEventListener('click', generateReadme);
-    
-    console.log('✅ App initialized');
+    console.log('✅ App initialized (AI Driven File Selection)');
 });
