@@ -6,9 +6,9 @@ import type { Config } from '../types/index.js';
 
 export const CONFIG: Config = {
     // 코드 분석 설정
-    MAX_FILES_TO_ANALYZE: 30,
+    MAX_FILES_TO_ANALYZE: 20,
     MAX_FILE_SIZE: 3000000, // 3MB
-    MAX_FILES_TO_SEND: 100, // README 생성 시 전송할 최대 파일 수
+    MAX_FILES_TO_SEND: 50, // README 생성 시 전송할 최대 파일 수
     
     // API 설정
     DEFAULT_MODEL: 'gemini-2.5-flash',
