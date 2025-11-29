@@ -6,7 +6,7 @@ import { createChain, runChain } from './src/core/langchain.js';
 import { showAlert, showStatus, updateChainProgress } from './src/utils/domUtils.js';
 import { buildTreeStructure, filterFiles, selectImportantFiles } from './src/utils/fileUtils.js';
 import { createProjectSummary } from './src/utils/projectUtils.js';
-import { README_GENERATION_PROMPT, CHAIN_STEP_PROMPTS, FEATURE_EXTRACTION_PROMPT } from './src/prompts/readmePrompts.js';
+import { README_GENERATION_PROMPT, CHAIN_STEP_PROMPTS } from './src/prompts/readmePrompts.js';
 import { PROJECT_CATEGORY_PROMPT, FILE_SELECTION_PROMPT } from './src/prompts/analysisPrompts.js'; // [New] FILE_SELECTION_PROMPT 추가
 import { PROJECT_TYPE_HINTS } from './src/config/projectTypes.js';
 import type { ProjectData } from './src/types/index.js';
@@ -248,22 +248,24 @@ async function generateReadme(): Promise<void> {
         const isOptimized = (document.querySelector('input[name="generationMode"]:checked') as HTMLInputElement)?.value === 'optimized';
         let result: string;
 
+        const projectType = projectData.language;
+        const typeHints = PROJECT_TYPE_HINTS[projectType] || PROJECT_TYPE_HINTS['default'];
+
         if (isOptimized) {
             // ⚡ 빠른 모드: 단일 호출
             console.log('⚡ [Fast Mode] 단일 요청 실행');
             showStatus('⚡ AI가 README를 작성 중입니다...');
 
-            const projectType = detectProjectType(projectData.files);
-            const typeHints = PROJECT_TYPE_HINTS[projectType] || PROJECT_TYPE_HINTS['default'];
+
 
             const projectSummaryRaw = `
-프로젝트명: ${projectData.name}
-언어: ${projectData.language}
-프로젝트 구조:
-${projectData.structure.slice(0, 3000)}
+            프로젝트명: ${projectData.name}
+            언어: ${projectData.language}
+            프로젝트 구조:
+            ${projectData.structure.slice(0, 3000)}
 
-핵심 파일 내용:
-${Object.entries(projectData.mainFiles).map(([path, content]) => `### ${path}\n${content.slice(0, 2000)}`).join('\n\n')}
+            핵심 파일 내용:
+            ${Object.entries(projectData.mainFiles).map(([path, content]) => `### ${path}\n${content.slice(0, 2000)}`).join('\n\n')}
             `;
 
             const readmeChain = await createChain(README_GENERATION_PROMPT, ['projectType', 'typeHints', 'projectSummary']);
@@ -277,40 +279,49 @@ ${Object.entries(projectData.mainFiles).map(([path, content]) => `### ${path}\n$
             // 🔗 체인 모드: 단계별 실행
             console.log('🔗 [Chain Mode] 단계별 실행');
 
+            const codeFilesText = Object.entries(projectData.mainFiles).map(([path, content]) => `### ${path}\n${content.slice(0, 1000)}`).join('\n\n');
+            const projectContext = `
+            Project Name: ${projectData.name}
+            Project Type: ${projectType}
+            File Structure:
+            ${projectData.structure.slice(0, 1000)}
+            Key Files Content:
+            ${codeFilesText}
+            `;
+
             updateChainProgress(0);
-            const featureChain = await createChain(FEATURE_EXTRACTION_PROMPT, ['name', 'language', 'codeFiles']);
-            const codeFilesText = Object.entries(projectData.mainFiles)
-                .map(([path, content]) => `### ${path}\n${content.slice(0, 1000)}`).join('\n\n');
-            const features = await runChain(featureChain, {
-                name: projectData.name,
-                language: projectData.language,
-                codeFiles: codeFilesText
-            });
+            const introChain = await createChain(CHAIN_STEP_PROMPTS.intro, ['projectContext']);
+            const introSection = await runChain(introChain, { projectContext });
 
             updateChainProgress(1);
-            const installChain = await createChain(CHAIN_STEP_PROMPTS.installation, ['name', 'language', 'projectType']);
-            const installation = await runChain(installChain, {
-                name: projectData.name,
-                language: projectData.language,
-                projectType: projectData.language
+            const featureChain = await createChain(CHAIN_STEP_PROMPTS.features, ['projectContext','typeHints']);
+            const features = await runChain(featureChain, {
+                projectContext,
+                typeHints
             });
 
             updateChainProgress(2);
-            const usageChain = await createChain(CHAIN_STEP_PROMPTS.usage, ['projectInfo', 'features']);
+            const installChain = await createChain(CHAIN_STEP_PROMPTS.installation, ['projectContext','typeHints']);
+            const installation = await runChain(installChain, {
+                projectContext,
+                typeHints
+            });
+
+            updateChainProgress(2);
+            const usageChain = await createChain(CHAIN_STEP_PROMPTS.usage, ['projectContext', 'typeHints']);
             const usage = await runChain(usageChain, {
-                projectInfo: `Project: ${projectData.name}, Lang: ${projectData.language}`,
-                features
+                projectContext,
+                typeHints
             });
 
             updateChainProgress(3);
-            const structureChain = await createChain(CHAIN_STEP_PROMPTS.structure, ['structure']);
-            const structureDesc = await runChain(structureChain, { structure: projectData.structure.slice(0, 1000) });
+            const structureChain = await createChain(CHAIN_STEP_PROMPTS.structure, ['projectContext']);
+            const structureDesc = await runChain(structureChain, { projectContext });
 
-            result = `# ${projectData.name}\n\n## ✨ 주요 기능\n${features}\n\n## 🚀 설치 방법\n${installation}\n\n## 💻 사용법\n${usage}\n\n## 📁 구조\n${structureDesc}`;
+            result = `${introSection}\n\n## ✨ 주요 기능\n${features}\n\n## 🚀 설치 및 실행\n${installation}\n\n## 💻 사용법\n${usage}\n\n## 📁 구조\n${structureDesc}`;
         }
 
         if (resultMarkdown) resultMarkdown.value = result;
-        // [Fix] marked 라이브러리 사용 시 await 추가
         if (resultPreview) resultPreview.innerHTML = await marked.parse(result);
         if (resultSection) resultSection.style.display = 'block';
 

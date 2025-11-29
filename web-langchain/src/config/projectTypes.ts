@@ -25,8 +25,7 @@ export const PROJECT_TYPE_HINTS: Record<string, string> = {
    - 애니메이션 시스템 (Animator)
    - UI 구성 (Canvas, UI Toolkit)
 
-❌ 금지: "npm install", "git clone" 같은 일반 웹개발 명령어
-✅ 필수: Unity Hub 프로젝트 열기 방법 설명`,
+❌ 금지: 설치하는 방법  설명 X.`,
 
     'Unreal Engine Game': `
 📋 필수 작성 항목:
@@ -34,8 +33,7 @@ export const PROJECT_TYPE_HINTS: Record<string, string> = {
 2️⃣ Unreal Engine 버전
 3️⃣ 주요 C++ 클래스 및 블루프린트 구조
 4️⃣ 맵/레벨 구성
-5️⃣ Visual Studio 연동 및 빌드 방법
-❌ 금지: npm, pip 같은 비관련 명령어`,
+❌ 금지 : 설치하는방법은 설명 X`,
 
     'Flutter App': `
 📋 필수 작성 항목:
