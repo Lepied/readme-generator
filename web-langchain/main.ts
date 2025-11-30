@@ -33,8 +33,6 @@ const toggleKeyBtn = document.getElementById('toggleKey') as HTMLButtonElement;
 const modelSelect = document.getElementById('modelSelect') as HTMLSelectElement;
 const githubUrlInput = document.getElementById('githubUrl') as HTMLInputElement;
 const analyzeGithubBtn = document.getElementById('analyzeGithubBtn') as HTMLButtonElement;
-const zipFile = document.getElementById('zipFile') as HTMLInputElement;
-const zipUploadArea = document.getElementById('zipUploadArea') as HTMLDivElement;
 const projectInfoCard = document.getElementById('projectInfoCard') as HTMLDivElement;
 const detectedName = document.getElementById('detectedName') as HTMLSpanElement;
 const detectedLanguage = document.getElementById('detectedLanguage') as HTMLSpanElement;
@@ -374,7 +372,7 @@ function detectProjectType(files: string[]): string {
 // Other Utils & Init
 // ============================================
 function setupTabs(): void {
-    //  메인 소스 탭 (GitHub / ZIP / Manual)
+    //  메인 소스 탭 (GitHub / Manual)
     const sourceTabs = document.querySelectorAll('.source-tabs .tab-btn');
     sourceTabs.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -382,8 +380,8 @@ function setupTabs(): void {
             sourceTabs.forEach(b => b.classList.remove('active'));
             // .tab-content를 모두 비활성화하는 로직 수정
             // tab-content 클래스를 가진 요소들 중 source-tabs 관련 요소만 찾아야 함
-            // 여기서는 GitHub/ZIP/Manual 탭에 대응하는 id를 가진 요소들을 직접 제어합니다.
-            ['github-tab', 'zip-tab', 'manual-tab'].forEach(id => {
+            // 여기서는 GitHub/Manual 탭에 대응하는 id를 가진 요소들을 직접 제어합니다.
+            ['github-tab', 'manual-tab'].forEach(id => {
                 document.getElementById(id)?.classList.remove('active');
             });
 
@@ -440,23 +438,6 @@ downloadBtn?.addEventListener('click', () => {
         URL.revokeObjectURL(url);
     }
 });
-
-// ZIP Upload Handler (Placeholder)
-async function handleZipFile(file: File): Promise<void> {
-    if (!file.name.endsWith('.zip')) return showAlert('ZIP 파일만 가능합니다.', 'error');
-    showAlert('ZIP 분석 기능은 준비 중입니다.', 'info');
-}
-
-// Event Listeners for ZIP
-zipUploadArea?.addEventListener('click', () => zipFile?.click());
-zipUploadArea?.addEventListener('dragover', (e) => { e.preventDefault(); zipUploadArea.style.borderColor = '#4CAF50'; });
-zipUploadArea?.addEventListener('dragleave', () => { if (zipUploadArea) zipUploadArea.style.borderColor = '#ddd'; });
-zipUploadArea?.addEventListener('drop', async (e) => {
-    e.preventDefault();
-    if (zipUploadArea) zipUploadArea.style.borderColor = '#ddd';
-    if (e.dataTransfer?.files[0]) await handleZipFile(e.dataTransfer.files[0]);
-});
-zipFile?.addEventListener('change', async (e) => { if ((e.target as HTMLInputElement)?.files?.[0]) await handleZipFile((e.target as HTMLInputElement).files![0]); });
 
 document.addEventListener('DOMContentLoaded', () => {
     loadApiKey();

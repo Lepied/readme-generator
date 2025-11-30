@@ -41,7 +41,6 @@
             
             <div class="source-tabs">
                 <button class="tab-btn active" data-tab="github">🌐 GitHub</button>
-                <button class="tab-btn" data-tab="zip">📦 ZIP Upload</button>
                 <button class="tab-btn" data-tab="manual">✍️ Manual</button>
             </div>
 
@@ -49,18 +48,6 @@
             <div id="github-tab" class="tab-content active">
                 <input type="text" id="githubUrl" placeholder="예: https://github.com/facebook/react">
                 <button id="analyzeGithubBtn" class="btn primary">🔍 Repository 분석하기</button>
-            </div>
-
-            <!-- ZIP Tab -->
-            <div id="zip-tab" class="tab-content">
-                <div id="zipUploadArea" class="file-upload-area">
-                    <p>📦 ZIP 파일을 드래그하거나 클릭하세요</p>
-                    <input type="file" id="zipFile" accept=".zip" hidden>
-                </div>
-                <div id="zipInfo" style="display: none;">
-                    <p>✅ <span id="zipName"></span></p>
-                    <p><span id="zipSize"></span></p>
-                </div>
             </div>
 
             <!-- Manual Tab -->
@@ -94,7 +81,7 @@
                     <input type="radio" name="generationMode" value="optimized" checked>
                     <div class="mode-card">
                         <strong>⚡ 빠른 모드 </strong>
-                        <p>1회 API 호출 | 75% 비용 절감</p>
+                        <p>자유형식</p>
                         <span class="badge success">빠름</span>
                     </div>
                 </label>
@@ -102,7 +89,7 @@
                     <input type="radio" name="generationMode" value="chain">
                     <div class="mode-card">
                         <strong>🔗 체인 모드</strong>
-                        <p>4회 API 호출 | 더 정교함</p>
+                        <p>형식적</p>
                         <span class="badge info">정교함</span>
                     </div>
                 </label>
