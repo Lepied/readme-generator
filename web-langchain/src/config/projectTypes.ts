@@ -4,7 +4,7 @@
 
 export const PROJECT_TYPE_HINTS: Record<string, string> = {
     'Unity Game': `
-📋 필수 작성 항목 (절대 생략 금지):
+📋[ 필수 작성 항목 :]
 
 1️⃣ 게임 컨셉 및 힌트
    - 이 게임의 장르 (FPS, RPG, 퍼즐, 플랫포머 등)

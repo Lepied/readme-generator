@@ -318,7 +318,7 @@ async function generateReadme(): Promise<void> {
             const structureChain = await createChain(CHAIN_STEP_PROMPTS.structure, ['projectContext']);
             const structureDesc = await runChain(structureChain, { projectContext });
 
-            result = `${introSection}\n\n## ✨ 주요 기능\n${features}\n\n## 🚀 설치 및 실행\n${installation}\n\n## 💻 사용법\n${usage}\n\n## 📁 구조\n${structureDesc}`;
+            result = `\n\n${introSection}\n\n\n## ✨ 주요 기능\n${features}\n\n\n## 🚀 설치 및 실행\n${installation}\n\n\n## 💻 사용법\n${usage}\n\n\n## 📁 구조\n${structureDesc}\n\n`;
         }
 
         if (resultMarkdown) resultMarkdown.value = result;
@@ -373,6 +373,56 @@ function detectProjectType(files: string[]): string {
 // ============================================
 // Other Utils & Init
 // ============================================
+function setupTabs(): void {
+    //  메인 소스 탭 (GitHub / ZIP / Manual)
+    const sourceTabs = document.querySelectorAll('.source-tabs .tab-btn');
+    sourceTabs.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // 모든 탭 비활성화
+            sourceTabs.forEach(b => b.classList.remove('active'));
+            // .tab-content를 모두 비활성화하는 로직 수정
+            // tab-content 클래스를 가진 요소들 중 source-tabs 관련 요소만 찾아야 함
+            // 여기서는 GitHub/ZIP/Manual 탭에 대응하는 id를 가진 요소들을 직접 제어합니다.
+            ['github-tab', 'zip-tab', 'manual-tab'].forEach(id => {
+                document.getElementById(id)?.classList.remove('active');
+            });
+
+            // 선택된 탭 활성화
+            btn.classList.add('active');
+            const tabId = btn.getAttribute('data-tab');
+            const targetContent = document.getElementById(`${tabId}-tab`);
+            if (targetContent) targetContent.classList.add('active');
+        });
+    });
+    
+    //결과 탭 (Preview / Markdown) 
+    const resultTabsContainer = document.querySelector('#resultSection .tabs'); 
+    if (resultTabsContainer) {
+        const resultTabs = resultTabsContainer.querySelectorAll('.tab-btn');
+        resultTabs.forEach(btn => {
+            btn.addEventListener('click', () => {
+                // 결과 섹션 내의 모든 탭 버튼 비활성화
+                resultTabs.forEach(b => b.classList.remove('active'));
+                
+                // 결과 섹션 내의 모든 탭 내용 비활성화 (preview-tab, markdown-tab)
+                const previewTab = document.getElementById('preview-tab');
+                const markdownTab = document.getElementById('markdown-tab');
+                if (previewTab) previewTab.classList.remove('active');
+                if (markdownTab) markdownTab.classList.remove('active');
+
+                // 선택된 탭 활성화
+                btn.classList.add('active');
+                const tabId = btn.getAttribute('data-tab');
+                const targetContent = document.getElementById(`${tabId}-tab`); // preview-tab 또는 markdown-tab
+                if (targetContent) {
+                    targetContent.classList.add('active');
+                    console.log(`탭 전환: ${tabId}`); // 디버깅용 로그
+                }
+            });
+        });
+    }
+}
+
 
 copyBtn?.addEventListener('click', () => {
     if (resultMarkdown.value) {
@@ -410,6 +460,7 @@ zipFile?.addEventListener('change', async (e) => { if ((e.target as HTMLInputEle
 
 document.addEventListener('DOMContentLoaded', () => {
     loadApiKey();
+    setupTabs();
     if (analyzeGithubBtn) analyzeGithubBtn.addEventListener('click', analyzeGitHub);
     if (generateBtn) generateBtn.addEventListener('click', generateReadme);
     console.log('✅ App initialized (AI Driven File Selection)');
