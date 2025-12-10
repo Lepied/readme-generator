@@ -33,6 +33,11 @@ const toggleKeyBtn = document.getElementById('toggleKey') as HTMLButtonElement;
 const modelSelect = document.getElementById('modelSelect') as HTMLSelectElement;
 const githubUrlInput = document.getElementById('githubUrl') as HTMLInputElement;
 const analyzeGithubBtn = document.getElementById('analyzeGithubBtn') as HTMLButtonElement;
+const projectNameInput = document.getElementById('projectName') as HTMLInputElement;
+const projectLanguageInput = document.getElementById('projectLanguage') as HTMLInputElement;
+const projectStructureInput = document.getElementById('projectStructure') as HTMLTextAreaElement;
+const projectDescriptionInput = document.getElementById('projectDescription') as HTMLTextAreaElement;
+const analyzeManualBtn = document.getElementById('analyzeManualBtn') as HTMLButtonElement;
 const projectInfoCard = document.getElementById('projectInfoCard') as HTMLDivElement;
 const detectedName = document.getElementById('detectedName') as HTMLSpanElement;
 const detectedLanguage = document.getElementById('detectedLanguage') as HTMLSpanElement;
@@ -227,6 +232,72 @@ async function processGitHubRepo(owner: string, repo: string, tree: any[]): Prom
                 `).join('')}
             </div>
         `;
+    }
+}
+
+// ============================================
+// Manual Input Processing
+// ============================================
+
+async function analyzeManual(): Promise<void> {
+    const name = projectNameInput?.value.trim();
+    const language = projectLanguageInput?.value.trim();
+    const structure = projectStructureInput?.value.trim();
+    const description = projectDescriptionInput?.value.trim();
+
+    if (!name || !language) {
+        return showAlert('프로젝트 이름과 언어를 입력하세요', 'error');
+    }
+
+    try {
+        if (analyzeManualBtn) {
+            analyzeManualBtn.disabled = true;
+            analyzeManualBtn.textContent = '처리 중...';
+        }
+
+        showStatus('📝 수동 입력 데이터 처리 중...');
+
+        // 기본 구조 생성 (입력이 없으면 기본값)
+        const finalStructure = structure || `${name}/\n├── src/\n└── README.md`;
+
+        // projectData 설정
+        projectData = {
+            name: name,
+            language: language,
+            structure: finalStructure,
+            files: [], // 수동 입력이므로 파일 목록 없음
+            mainFiles: {} // 파일 내용도 없음
+        };
+
+        // 설명이 있으면 추가 정보로 저장 (README 생성 시 활용)
+        if (description) {
+            // mainFiles에 가상의 설명 파일로 저장
+            projectData.mainFiles['PROJECT_DESCRIPTION.txt'] = description;
+        }
+
+        // UI 업데이트
+        if (projectInfoCard) projectInfoCard.style.display = 'block';
+        if (detectedName) detectedName.textContent = projectData.name;
+        if (detectedLanguage) detectedLanguage.textContent = projectData.language;
+
+        if (detectedFiles) {
+            detectedFiles.innerHTML = `
+                <p><strong>입력 방식:</strong> 수동 입력</p>
+                <p><strong>프로젝트 구조:</strong></p>
+                <pre style="max-height: 300px; overflow: auto; background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; font-size: 13px; line-height: 1.5; border: 1px solid #374151;">${finalStructure}</pre>
+                ${description ? `<p><strong>설명:</strong> ${description}</p>` : ''}
+            `;
+        }
+
+        showAlert('수동 입력 완료!', 'success');
+
+    } catch (error: any) {
+        showAlert('처리 실패: ' + error.message, 'error');
+    } finally {
+        if (analyzeManualBtn) {
+            analyzeManualBtn.disabled = false;
+            analyzeManualBtn.textContent = '✍️ 수동 입력 완료';
+        }
     }
 }
 
@@ -443,6 +514,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadApiKey();
     setupTabs();
     if (analyzeGithubBtn) analyzeGithubBtn.addEventListener('click', analyzeGitHub);
+    if (analyzeManualBtn) analyzeManualBtn.addEventListener('click', analyzeManual);
     if (generateBtn) generateBtn.addEventListener('click', generateReadme);
-    console.log('✅ App initialized (AI Driven File Selection)');
+    console.log('✅ App initialized (AI Driven File Selection + Manual Input)');
 });

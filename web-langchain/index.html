@@ -10,7 +10,6 @@
     <div class="container">
         <header>
             <h1>📝 README Auto Generator</h1>
-            <p class="subtitle">🔗 Powered by LangChain.js + Google Gemini</p>
         </header>
 
         <!-- API Key Section -->
@@ -54,7 +53,16 @@
             <div id="manual-tab" class="tab-content">
                 <input type="text" id="projectName" placeholder="프로젝트 이름">
                 <input type="text" id="projectLanguage" placeholder="주요 언어 (예: Python, JavaScript)">
-                <textarea id="projectStructure" rows="8" placeholder="프로젝트 구조 (선택사항)"></textarea>
+                <textarea id="projectStructure" rows="8" placeholder="프로젝트 구조 (선택사항)">
+src/
+├── components/
+│   ├── Header.tsx
+│   └── Footer.tsx
+├── utils/
+│   └── helpers.ts
+└── index.ts</textarea>
+                <textarea id="projectDescription" rows="4" placeholder="프로젝트 설명 (선택사항)"></textarea>
+                <button id="analyzeManualBtn" class="btn primary">✍️ 수동 입력 완료</button>
             </div>
         </section>
 
@@ -137,7 +145,7 @@
     </div>
 
     <footer>
-        <p>Made with 💙 using LangChain.js + Gemini API</p>
+        <p>Made with 💙 using Gemini API</p>
     </footer>
 
     <script type="module" src="/main.ts"></script>
